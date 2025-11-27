@@ -28,7 +28,7 @@ lora:
     - down_proj
 
 training:
-  num_generations: 12
+  num_generations: 8
   max_new_tokens: 768
   learning_rate: 5.0e-6
   num_train_epochs: 1
