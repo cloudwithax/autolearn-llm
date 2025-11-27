@@ -1,0 +1,117 @@
+# FP8 GRPO Configuration for NVIDIA B200 (192GB HBM3e)
+# Target: Complete HumanEval training in ~1 hour
+#
+# B200 specs: 192GB VRAM, native FP8, 2.25 PFLOPS FP8
+# This config maxes out everything for speed.
+
+model:
+  # Large model - B200 can handle it
+  name: "unsloth/Qwen3-32B"
+  # Alternatives:
+  # - unsloth/Qwen3-14B (faster, still great)
+  # - unsloth/Llama-3.3-70B-Instruct (if you have time)
+  # - deepseek-ai/DeepSeek-Coder-V2-Lite-Instruct (16B, code specialist)
+  
+  max_seq_length: 8192   # Long context, plenty of VRAM
+  load_in_4bit: false
+  load_in_fp8: true      # Native FP8 on Blackwell
+  fast_inference: true   # vLLM for generation
+
+lora:
+  rank: 128              # High rank for capacity
+  alpha: 128
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  # Aggressive generation for better GRPO signal
+  num_generations: 16    # More candidates = better policy gradient
+  max_new_tokens: 1024   # Full solutions
+  
+  learning_rate: 1.0e-5  # Can be more aggressive with large batch
+  num_train_epochs: 1    # Single epoch for speed
+  
+  # Large batches - B200 can handle it
+  per_device_train_batch_size: 8
+  gradient_accumulation_steps: 2
+  # Effective batch = 8 * 2 = 16
+  
+  warmup_ratio: 0.05     # Quick warmup
+  weight_decay: 0.01
+  
+  # Memory optimization (still useful)
+  gradient_checkpointing: true
+
+grpo:
+  beta: 0.04
+  reward_weights:
+    test_pass: 0.45
+    execution: 0.25
+    syntax: 0.15
+    lint: 0.10
+    complexity: 0.05
+
+dataset:
+  name: "humaneval"
+  max_samples: 164       # Full HumanEval
+
+execution:
+  timeout: 10.0          # More time for complex solutions
+  max_memory: 512
+  allow_network: false
+
+output:
+  dir: "./outputs/code_b200"
+  save_steps: 50
+  logging_steps: 5
+  push_to_hub: false
+
+# =============================================================================
+# ACCELERATION - MAXED OUT FOR B200
+# =============================================================================
+acceleration:
+  # Async rewards - max parallelism
+  async_rewards:
+    enabled: true
+    workers: 16          # Many threads, B200 has the CPU bandwidth
+    
+  # Reward caching
+  reward_cache:
+    enabled: true
+    max_size: 100000     # Large cache
+    
+  # Curriculum - skip it for speed (1 epoch anyway)
+  curriculum:
+    enabled: false
+    
+  # Speculative decoding - ENABLE for B200
+  speculative:
+    enabled: true
+    num_tokens: 8        # Aggressive speculation
+    dynamic: true
+    draft_model: "unsloth/Qwen3-1.7B"  # Small draft model
+    
+  # Token packing
+  token_packing:
+    enabled: true
+    min_pack_ratio: 0.8
+    
+  mode: "aggressive"
+
+# =============================================================================
+# MULTI-GPU (if available)
+# =============================================================================
+distributed:
+  # B200 NVLink for tensor parallelism
+  tensor_parallel_size: 1   # Set to 2/4/8 for multi-B200
+  pipeline_parallel_size: 1
+  
+  # FSDP settings
+  fsdp_sharding: "SHARD_GRAD_OP"  # Fastest for single GPU

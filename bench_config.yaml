@@ -1,0 +1,62 @@
+# GRPO Configuration for SWE-Bench and Terminal-Bench
+# Optimized for GTX 1060 (6GB VRAM)
+
+model:
+  name: "unsloth/Qwen2.5-Coder-0.5B-Instruct"
+  # Alternatives:
+  # - deepseek-ai/deepseek-coder-1.3b-instruct
+  # - Qwen/Qwen2.5-Coder-1.5B-Instruct
+  max_seq_length: 2048  # Patches/commands can be long
+  load_in_4bit: true
+
+lora:
+  rank: 16
+  alpha: 16
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+training:
+  num_generations: 4
+  max_completion_length: 512   # Patches can be long
+  
+  learning_rate: 3.0e-6        # Conservative for structured output
+  num_train_epochs: 2
+  
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  
+  gradient_checkpointing: true
+
+grpo:
+  beta: 0.04
+  
+  # SWE-Bench reward weights
+  swe_weights:
+    format: 0.3       # Valid patch format
+    similarity: 0.5   # Similar to gold patch
+    files: 0.2        # Targets correct files
+  
+  # Terminal-Bench reward weights
+  terminal_weights:
+    format: 0.2       # Valid command format
+    safety: 0.3       # No dangerous commands
+    execution: 0.5    # Commands actually work
+
+# Benchmark-specific settings
+swe_bench:
+  variant: "Lite"     # Lite (300), Verified (500), or Full (2294)
+  prompt_style: "instruct"
+  max_samples: 100
+
+terminal_bench:
+  version: "core"
+  max_samples: 25
+
+output:
+  dir: "./outputs/bench"
+  save_steps: 50
+  logging_steps: 10

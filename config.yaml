@@ -1,0 +1,54 @@
+# FP8 GRPO Training Configuration
+# Optimized for consumer GPUs (5-24GB VRAM)
+
+model:
+  name: "unsloth/Qwen3-1.7B"  # Fits in 5GB VRAM with FP8
+  # Alternatives:
+  # - unsloth/Qwen3-4B (8GB)
+  # - unsloth/Qwen3-8B (16GB)
+  # - unsloth/Llama-3.2-1B (5GB)
+  # - unsloth/Llama-3.2-3B (8GB)
+  max_seq_length: 2048
+  load_in_fp8: true
+  fast_inference: true  # Enable vLLM
+
+lora:
+  rank: 32
+  alpha: 32
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  num_generations: 4      # Candidates per prompt (GRPO)
+  max_new_tokens: 512     # Max tokens per generation
+  learning_rate: 5.0e-6
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 4
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  
+grpo:
+  beta: 0.04              # KL penalty coefficient
+  reward_weights:         # Weights for multi-objective rewards
+    correctness: 1.0
+    format: 0.5
+    reasoning: 0.3
+
+dataset:
+  name: "openai/gsm8k"    # Math reasoning dataset
+  split: "train"
+  max_samples: 1000       # Limit for quick experiments
+
+output:
+  dir: "./outputs"
+  save_steps: 100
+  logging_steps: 10
+  push_to_hub: false

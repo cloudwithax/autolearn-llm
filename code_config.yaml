@@ -1,0 +1,110 @@
+# FP8 GRPO Configuration for Code Generation
+# Optimized for coding benchmarks (HumanEval, MBPP, Terminal Bench)
+
+model:
+  name: "unsloth/Qwen3-1.7B"  # 5GB VRAM
+  # Alternatives for more VRAM:
+  # - Qwen/Qwen2.5-Coder-1.5B (specialized for code)
+  # - unsloth/Qwen3-4B (8GB)
+  # - deepseek-ai/deepseek-coder-1.3b-instruct (code specialist)
+  # - unsloth/Qwen3-8B (16GB)
+  max_seq_length: 4096  # Longer for code
+  load_in_fp8: true
+  fast_inference: true
+
+lora:
+  rank: 64  # Higher rank for code (more capacity)
+  alpha: 64
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj  
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  # More generations = more diverse code solutions to rank
+  num_generations: 8
+  max_new_tokens: 768  # Code can be longer
+  
+  # Conservative LR for code (avoid breaking syntax understanding)
+  learning_rate: 2.0e-6
+  num_train_epochs: 3
+  
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 4
+  
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+
+grpo:
+  beta: 0.04  # KL penalty
+  
+  # Reward weights - what matters for coding benchmarks
+  reward_weights:
+    test_pass: 0.50      # Primary: does it pass tests?
+    execution: 0.20      # Does it run without crashing?
+    syntax: 0.15         # Is it valid Python?
+    lint: 0.10           # Is it clean code?
+    complexity: 0.05     # Is it elegant?
+    
+    # Advanced rewards (enable in code_rewards.py):
+    # type_safety: 0.0   # Mypy compliance
+    # performance: 0.0   # Execution speed
+
+dataset:
+  name: "humaneval"  # or "mbpp"
+  max_samples: 164   # Full HumanEval
+
+execution:
+  # Safety settings for code execution
+  timeout: 5.0       # Max seconds per execution
+  max_memory: 256    # MB (not enforced on Windows)
+  allow_network: false
+
+output:
+  dir: "./outputs/code"
+  save_steps: 50
+  logging_steps: 10
+  push_to_hub: false
+
+# =============================================================================
+# ACCELERATION OPTIONS (Novel Methods for Faster Training)
+# =============================================================================
+acceleration:
+  # Async reward computation - parallel reward evaluation
+  async_rewards:
+    enabled: true
+    workers: 4  # Thread pool size for slow rewards (test execution)
+    
+  # Reward caching - cache deterministic rewards (syntax, lint)
+  reward_cache:
+    enabled: true
+    max_size: 50000  # LRU cache capacity
+    
+  # Curriculum learning - easy to hard scheduling
+  curriculum:
+    enabled: true
+    strategy: "length"  # length, complexity, or success_rate
+    warmup_steps: 100   # Steps before full difficulty
+    
+  # Speculative decoding (requires vLLM 0.4+)
+  # Based on FastGRPO paper - 2.35-2.72x speedup
+  speculative:
+    enabled: false      # Set true with compatible vLLM
+    num_tokens: 4       # Tokens to speculate per step
+    dynamic: true       # Adjust based on batch size
+    
+  # Token packing - pack short sequences together
+  token_packing:
+    enabled: true
+    min_pack_ratio: 0.7  # Minimum packing efficiency
+    
+  # Speedup mode presets
+  # - conservative: caching only, same quality
+  # - balanced: async + caching + curriculum  
+  # - aggressive: fewer generations, larger batches
+  mode: "balanced"

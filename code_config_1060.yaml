@@ -1,0 +1,79 @@
+# GRPO Configuration for GTX 1060 (6GB VRAM)
+# Uses 4-bit quantization instead of FP8
+
+model:
+  # Smallest viable code models for 6GB:
+  name: "unsloth/Qwen2.5-Coder-0.5B-Instruct"
+  # Alternatives:
+  # - unsloth/Qwen2.5-0.5B (general purpose)
+  # - TinyLlama/TinyLlama-1.1B-Chat-v1.0
+  # - microsoft/phi-1 (1.3B, decent at code)
+  
+  max_seq_length: 1024  # Keep short to fit in VRAM
+  load_in_4bit: true    # 4-bit quantization (NOT FP8)
+  load_in_fp8: false    # GTX 1060 doesn't support FP8
+  fast_inference: false # vLLM needs more VRAM, disable
+
+lora:
+  rank: 16              # Lower rank for memory
+  alpha: 16
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    # Skip MLP layers to save memory
+    # - gate_proj
+    # - up_proj
+    # - down_proj
+
+training:
+  # Fewer generations due to memory constraints
+  num_generations: 2    # Minimum for GRPO
+  max_new_tokens: 256   # Shorter outputs
+  
+  learning_rate: 5.0e-6
+  num_train_epochs: 1
+  
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8  # Compensate for batch=1
+  
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  
+  # Memory optimization
+  gradient_checkpointing: true
+  
+grpo:
+  beta: 0.04
+  reward_weights:
+    test_pass: 0.50
+    execution: 0.25
+    syntax: 0.15
+    lint: 0.10
+    # Skip complexity/perf for speed
+    complexity: 0.0
+
+dataset:
+  name: "humaneval"
+  max_samples: 50       # Start small on limited VRAM
+
+output:
+  dir: "./outputs/code_1060"
+  save_steps: 25
+  logging_steps: 5
+
+# Acceleration (conservative for 6GB VRAM)
+acceleration:
+  async_rewards:
+    enabled: true
+    workers: 2  # Fewer threads, less memory
+  reward_cache:
+    enabled: true
+    max_size: 10000
+  curriculum:
+    enabled: true
+    strategy: "length"
+    warmup_steps: 50
+  mode: "conservative"  # Safe for limited VRAM
