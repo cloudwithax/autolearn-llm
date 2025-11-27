@@ -12,7 +12,7 @@ model:
   max_seq_length: 8192
   load_in_4bit: false
   load_in_fp8: true # Native FP8 on Hopper
-  fast_inference: true
+  fast_inference: false  # Disabled - vLLM/flashinfer incompatible with this CUDA
 
 lora:
   rank: 64

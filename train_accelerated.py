@@ -306,12 +306,13 @@ def main():
     )
     
     # Load model
-    print("\n📦 Loading model with FP8...")
+    fast_inference = config.get("model", {}).get("fast_inference", False)
+    print(f"\n📦 Loading model with FP8... (vLLM: {fast_inference})")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         max_seq_length=max_seq_length,
-        load_in_4bit=False,
-        fast_inference=True,
+        load_in_4bit=config.get("model", {}).get("load_in_4bit", False),
+        fast_inference=fast_inference,
         max_lora_rank=lora_rank,
         load_in_fp8=load_in_fp8,
     )
