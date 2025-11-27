@@ -1,0 +1,71 @@
+# FP8 GRPO Configuration for H100 (80GB HBM3)
+# Target: Complete HumanEval training in ~45-60 minutes
+#
+# H100 specs: 80GB HBM3, native FP8, Hopper architecture
+
+model:
+  name: "unsloth/Qwen3-14B"
+  # Alternatives:
+  # - unsloth/Qwen3-8B (faster, fits easily)
+  # - unsloth/Qwen3-32B (tight fit with FP8)
+
+  max_seq_length: 8192
+  load_in_4bit: false
+  load_in_fp8: true # Native FP8 on Hopper
+  fast_inference: true
+
+lora:
+  rank: 64
+  alpha: 64
+  dropout: 0.0
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+training:
+  num_generations: 12
+  max_new_tokens: 768
+  learning_rate: 5.0e-6
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4
+  warmup_ratio: 0.05
+  weight_decay: 0.01
+  gradient_checkpointing: true
+
+grpo:
+  beta: 0.04
+  reward_weights:
+    test_pass: 0.45
+    execution: 0.25
+    syntax: 0.15
+    lint: 0.10
+    complexity: 0.05
+
+dataset:
+  name: "humaneval"
+  max_samples: 164
+
+output:
+  dir: "./outputs/code_h100"
+  save_steps: 25
+  logging_steps: 5
+
+acceleration:
+  async_rewards:
+    enabled: true
+    workers: 8
+  reward_cache:
+    enabled: true
+    max_size: 50000
+  curriculum:
+    enabled: false
+  speculative:
+    enabled: true
+    num_tokens: 6
+  mode: "aggressive"
